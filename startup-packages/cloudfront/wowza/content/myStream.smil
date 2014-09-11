@@ -1,0 +1,23 @@
+<smil>
+	<head>
+	</head>
+	<body>
+		<switch>
+			<video src="mp4:myStream1" system-bitrate="296000" video-bitrate="200000" audio-bitrate="96000">
+				<param name="videoCodecId" value="avc1.66.30" valuetype="data"/>
+				<param name="audioCodecId" value="mp4a.40.2" valuetype="data"/>
+				<param name="audioOnly" value="FALSE" valuetype="data"/>
+			</video>
+			<video src="mp4:myStream2" system-bitrate="446000" video-bitrate="350000" audio-bitrate="96000">
+				<param name="videoCodecId" value="avc1.66.30" valuetype="data"/>
+				<param name="audioCodecId" value="mp4a.40.2" valuetype="data"/>
+				<param name="audioOnly" value="FALSE" valuetype="data"/>
+			</video>
+			<video src="mp4:myStream3" system-bitrate="596000" video-bitrate="400000" audio-bitrate="96000">
+				<param name="videoCodecId" value="avc1.66.30" valuetype="data"/>
+				<param name="audioCodecId" value="mp4a.40.2" valuetype="data"/>
+				<param name="audioOnly" value="FALSE" valuetype="data"/>
+			</video>
+		</switch>
+	</body>
+</smil>

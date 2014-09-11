@@ -1,0 +1,148 @@
+{
+    "AWSTemplateFormatVersion" : "2010-09-09",
+
+    "Description" : "This template creates a CloudFormation stack that uses Amazon CloudFront and and Amazon EC2 AMI for Wowza Streaming Engine 4 to deliver live streaming of your event",
+
+    "Parameters" : {
+        "InstanceType" : {
+            "Type"                  : "String",
+            "Description"           : "The type of Amazon EC2 instance to launch. Valid values are: m1.small, m1.medium, m1.large, m1.xlarge, m2.xlarge, m2.2xlarge, m2.4xlarge, m3.medium, m3.large, m3.xlarge, m3.2xlarge, c3.xlarge, c3.2xlarge, c3.8xlarge.",
+            "Default"               : "m3.large",
+            "AllowedValues"         : [ "m1.small", "m1.medium", "m1.large", "m1.xlarge", "m2.xlarge", "m2.2xlarge", "m2.4xlarge", "m3.medium", "m3.large", "m3.xlarge", "m3.2xlarge", "c3.xlarge", "c3.2xlarge", "c3.8xlarge" ],
+            "ConstraintDescription" : "must be a valid Amazon EC2 instance type."
+        },
+        "KeyPair" : {
+            "Type" : "String",
+            "Description" : "The name of an Amazon EC2 key pair in the region where you are creating the CloudFormation stack."
+        },
+        "StartupPackageURL" : {
+            "Type" : "String",
+            "Description" : "The startup package to use for the Wowza Streaming Engine configuration. Default value is a CloudFront delivery startup package.",
+            "Default"     : "https://s3.amazonaws.com/wowzamediasystems/com/wowza/startup/4.0.0/cloudfront.zip"
+        },
+        "WowzaLicenseKey" : {
+            "Type" : "String",
+            "Description" : "The Wowza Streaming Engine 4 license key(s) (pipe '|' separated if multiple keys such as Wowza Transcoder).",
+            "MinLength"   : "0",
+            "MaxLength"   : "200",
+            "Default"     : ""
+        },
+        "ApplicationName" : {
+            "Type" : "String",
+            "Description" : "The Wowza Streaming Engine application name (no spaces allowed). If you are not using a custom application, do not change this value.",
+            "Default" : "livecf"
+        },
+        "StreamName" : {
+            "Type" : "String",
+            "Description" : "The Wowza Streaming Engine stream name (no spaces allowed). Default value is myStream.",
+            "Default" : "myStream"
+        }
+    },
+
+    "Mappings" : {
+        "RegionMap" : {
+            "us-east-1"      : { "AMI" : "ami-f58e949c" },
+            "us-west-1"      : { "AMI" : "ami-e6d3eba3" },
+            "us-west-2"      : { "AMI" : "ami-e4ff8ad4" },
+            "eu-west-1"      : { "AMI" : "ami-c77fbab0" },
+            "ap-southeast-1" : { "AMI" : "ami-68a0f33a" },
+            "ap-northeast-1" : { "AMI" : "ami-81453f80" },
+            "ap-southeast-2" : { "AMI" : "ami-4d21b977" },
+            "sa-east-1"      : { "AMI" : "ami-bfc16ca2" }
+        }
+    },
+
+    "Resources" : {
+        "LiveStreamingDistribution" : {
+            "Type" : "AWS::CloudFront::Distribution",
+            "Properties" : {
+               "DistributionConfig" : {
+                   "CustomOrigin" : {
+                       "DNSName"              : { "Fn::GetAtt" : [ "WowzaServerOriginServer", "PublicDnsName" ] },
+                       "HTTPPort"             : "80",
+                       "HTTPSPort"            : "443",
+                       "OriginProtocolPolicy" : "http-only"
+                   },
+                   "Enabled" : "true",
+                   "Comment" : "Live HTTP Streaming"
+                }
+
+            }
+        },
+
+        "WowzaServerOriginServer" : {
+            "Type" : "AWS::EC2::Instance",
+            "Properties" : {
+                "SecurityGroups" : [ { "Ref" : "WowzaServerOriginServerSecurityGroup" } ],
+                "KeyName"        : { "Ref" : "KeyPair" },
+                "ImageId"        : { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "AMI" ]},
+                "InstanceType"   : {"Ref" : "InstanceType"},
+                "UserData" : { "Fn::Base64" : { "Fn::Join" : [ "", [ "WZA_startupPackageURL=", { "Ref" : "StartupPackageURL" }, ",", "WZA_wowzaServerLicenseKey=", { "Ref" : "WowzaLicenseKey" }  ] ] }}
+            }
+        },
+
+        "WowzaServerOriginServerSecurityGroup" : {
+            "Type" : "AWS::EC2::SecurityGroup",
+            "Properties" : {
+                "GroupDescription" : "Security group for live HTTP streaming using Amazon CloudFront",
+                "SecurityGroupIngress" : [
+                    {"IpProtocol" : "tcp", "FromPort" : "21", "ToPort" : "21", "CidrIp" : "0.0.0.0/0"},
+                    {"IpProtocol" : "tcp", "FromPort" : "22", "ToPort" : "22", "CidrIp" : "0.0.0.0/0"},
+                    {"IpProtocol" : "tcp", "FromPort" : "80", "ToPort" : "80", "CidrIp" : "0.0.0.0/0"},
+                    {"IpProtocol" : "tcp", "FromPort" : "443", "ToPort" : "443", "CidrIp" : "0.0.0.0/0"},
+                    {"IpProtocol" : "tcp", "FromPort" : "554", "ToPort" : "554", "CidrIp" : "0.0.0.0/0"},
+                    {"IpProtocol" : "tcp", "FromPort" : "1935", "ToPort" : "1935", "CidrIp" : "0.0.0.0/0"},
+                    {"IpProtocol" : "tcp", "FromPort" : "8084", "ToPort" : "8088", "CidrIp" : "0.0.0.0/0"},
+                    {"IpProtocol" : "udp", "FromPort" : "0", "ToPort" : "65535", "CidrIp" : "0.0.0.0/0"}
+                ]
+            }
+        }
+    },
+
+    "Outputs" : {
+        "PlaybackHLSURL" : {
+            "Value" : { "Fn::Join" : ["", ["http://", { "Fn::GetAtt" : ["LiveStreamingDistribution", "DomainName"] }, "/", { "Ref" : "ApplicationName" }, "/", { "Ref" : "StreamName" }, "/playlist.m3u8"]] },
+            "Description" : "Apple HLS Playback URL"
+        },
+        "PlaybackDASHURL" : {
+            "Value" : { "Fn::Join" : ["", ["http://", { "Fn::GetAtt" : ["LiveStreamingDistribution", "DomainName"] }, "/", { "Ref" : "ApplicationName" }, "/", { "Ref" : "StreamName" }, "/manifest.mpd"]] },
+            "Description" : "MPEG-DASH Playback URL"
+        },
+        "PlaybackHDSURL" : {
+            "Value" : { "Fn::Join" : ["", ["http://", { "Fn::GetAtt" : ["LiveStreamingDistribution", "DomainName"] }, "/", { "Ref" : "ApplicationName" }, "/", { "Ref" : "StreamName" }, "/manifest.f4m"]] },
+            "Description" : "Adobe HDS Playback URL"
+        },
+        "PlaybackSmoothURL" : {
+            "Value" : { "Fn::Join" : ["", ["http://", { "Fn::GetAtt" : ["LiveStreamingDistribution", "DomainName"] }, "/", { "Ref" : "ApplicationName" }, "/", { "Ref" : "StreamName" }, "/Manifest"]] },
+            "Description" : "Microsoft Smooth Streaming Playback URL"
+        },
+        "PublishRTMPURL" : {
+            "Value" : { "Fn::Join" : ["", ["rtmp://", { "Fn::GetAtt" : ["WowzaServerOriginServer", "PublicDnsName"] }, "/", { "Ref" : "ApplicationName" }]] },
+            "Description" : "RTMP Publish URL"
+        },
+        "PublishStreamName" : {
+            "Value" : { "Ref" : "StreamName" },
+            "Description" : "RTMP Publish Stream Name"
+        },
+        "CloudFrontDomainName" : {
+            "Value" : { "Fn::GetAtt" : ["LiveStreamingDistribution", "DomainName"] },
+            "Description" : "CloudFront Domain Name"
+        },
+        "WowzaEngineDomainName" : {
+            "Value" : { "Fn::GetAtt" : ["WowzaServerOriginServer", "PublicDnsName"] },
+            "Description" : "Wowza Streaming Engine Domain Name"
+        },
+        "WowzaEngineManagerURL" : {
+            "Value" : { "Fn::Join" : ["", ["http://", { "Fn::GetAtt" : ["WowzaServerOriginServer", "PublicDnsName"] }, ":8088/enginemanager"]] },
+            "Description" : "Wowza Streaming Engine Manager URL"
+        },
+        "WowzaEngineStreamFTPURL" : {
+            "Value" : { "Fn::Join" : ["", ["ftp://", { "Fn::GetAtt" : ["WowzaServerOriginServer", "PublicDnsName"] }]] },
+            "Description" : "Wowza Streaming Engine FTP Server URL"
+        },
+        "WowzaServerLoginInfo" : {
+            "Value" : { "Fn::Join" : ["", ["username=wowza, password=", { "Ref" : "WowzaServerOriginServer" }]] },
+            "Description" : "Wowza Streaming Engine login information for Stream Manager and FTP access"
+        }
+    }
+}

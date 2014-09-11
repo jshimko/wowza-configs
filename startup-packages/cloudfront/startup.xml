@@ -1,0 +1,10 @@
+<Startup>
+	<Commands>
+		<Install>
+			<Folder>wowza</Folder>
+		</Install>
+		<RunScript>
+			<Script>tuning/tune.sh</Script>
+		</RunScript>
+	</Commands>
+</Startup>
